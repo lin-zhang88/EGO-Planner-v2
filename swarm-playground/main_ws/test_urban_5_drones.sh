@@ -22,7 +22,6 @@ fi
 
 # Source ROS
 source /opt/ros/noetic/setup.bash
-source devel/setup.bash
 
 echo "🔧 Building ROS workspace..."
 catkin_make -j1
@@ -34,6 +33,19 @@ fi
 
 echo "✅ Build successful!"
 echo ""
+
+# Source the workspace after building
+source devel/setup.bash
+
+# Check if ego_planner package is found
+echo "🔍 Checking if ego_planner package is available..."
+rospack find ego_planner
+
+if [ $? -ne 0 ]; then
+    echo "❌ ego_planner package not found. Trying to build again..."
+    catkin_make -j1
+    source devel/setup.bash
+fi
 
 # Launch the urban test
 echo "🚀 Launching Urban 5-Drone Test..."
