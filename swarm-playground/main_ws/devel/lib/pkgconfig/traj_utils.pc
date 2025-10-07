@@ -1,0 +1,8 @@
+prefix=/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/devel
+
+Name: traj_utils
+Description: Description of traj_utils
+Version: 0.0.0
+Cflags: -I/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/devel/include -I/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/src/planner/traj_utils/include
+Libs: -L${prefix}/lib -ltraj_utils
+Requires: message_runtime

@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/src/Utils/pose_utils/include/pose_utils.h
+iostream
+-
+armadillo
+/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/src/Utils/pose_utils/include/armadillo
+
+/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/src/Utils/pose_utils/src/pose_utils.cpp
+pose_utils.h
+/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/src/Utils/pose_utils/src/pose_utils.h
+

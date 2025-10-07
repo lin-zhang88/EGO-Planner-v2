@@ -1,0 +1,8 @@
+prefix=/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/devel
+
+Name: pose_utils
+Description: Description of pose_utils
+Version: 0.0.0
+Cflags: -I/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/src/Utils/pose_utils/include
+Libs: -L${prefix}/lib -lpose_utils
+Requires: 

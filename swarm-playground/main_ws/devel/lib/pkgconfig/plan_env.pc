@@ -1,0 +1,8 @@
+prefix=/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/devel
+
+Name: plan_env
+Description: Description of plan_env
+Version: 0.0.0
+Cflags: -I/home/cleiver/EGO-Planner-v2/swarm-playground/main_ws/src/planner/plan_env/include
+Libs: -L${prefix}/lib -lplan_env
+Requires: roscpp std_msgs
