@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- Launch bridge for drone_0 point cloud data -->
+    <node pkg="ros_to_dynamodb" 
+          type="ros_to_dynamodb_bridge.py" 
+          name="drone_0_cloud_to_dynamodb" 
+          output="screen">
+        
+        <param name="aws_region" value="us-east-1" />
+        <param name="table_name" value="drone_telemetry" />
+        <param name="drone_id" value="drone_0" />
+        <param name="topic_name" value="/drone_0_pcl_render_node/cloud" />
+        <param name="topic_type" value="PointCloud2" />
+        <param name="batch_size" value="25" />
+        <param name="rate_limit" value="10" />
+    </node>
+</launch>
+

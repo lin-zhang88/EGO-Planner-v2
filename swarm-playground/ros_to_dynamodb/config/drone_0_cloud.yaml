@@ -1,0 +1,17 @@
+# Configuration for drone_0 point cloud streaming to DynamoDB
+
+# AWS Configuration
+aws_region: "us-east-1"
+table_name: "drone_telemetry"
+
+# Drone Configuration
+drone_id: "drone_0"
+
+# Topic Configuration
+topic_name: "/drone_0_pcl_render_node/cloud"
+topic_type: "PointCloud2"
+
+# Performance settings
+batch_size: 25  # Number of messages to batch before writing
+rate_limit: 10  # Maximum messages per second to process (Hz)
+

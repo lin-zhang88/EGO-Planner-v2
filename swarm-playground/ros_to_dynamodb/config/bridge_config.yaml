@@ -1,0 +1,28 @@
+# ROS to DynamoDB Bridge Configuration
+
+# AWS Configuration
+aws_region: "us-east-1"  # Change to your AWS region
+table_name: "drone_telemetry"  # Your DynamoDB table name
+
+# Drone Configuration
+drone_id: "drone_7"  # Which drone to track
+
+# Topic Configuration
+# Available topics for drone_7:
+# - /drone_7_ego_planner_node/grid_map/occupancy_inflate
+# - /drone_7_ego_planner_node/init_list
+# - /drone_7_ego_planner_node/optimal_list
+# - /drone_7_ego_planner_node/optimal_list_array
+# - /drone_7_odom_visualization/cmd
+# - /drone_7_odom_visualization/covariance
+
+topic_name: "/drone_7_ego_planner_node/grid_map/occupancy_inflate"
+
+# Topic type - must match the message type
+# Supported: PointCloud2, Odometry, PoseStamped
+topic_type: "PointCloud2"
+
+# Performance settings
+batch_size: 25  # Number of messages to batch before writing (DynamoDB limit is 25)
+rate_limit: 10  # Maximum messages per second to process (Hz)
+

@@ -1,0 +1,84 @@
+============================================================
+QUICK COMMANDS FOR UBUNTU - Copy & Paste These!
+============================================================
+
+▶ STEP 1: Copy this entire folder to Ubuntu
+   Location: ros_to_dynamodb/
+   Copy to: ~/your_workspace/src/ros_to_dynamodb/
+
+▶ STEP 2: Install boto3 on Ubuntu
+   pip3 install boto3
+
+▶ STEP 3: Set AWS Credentials (run in terminal)
+   export AWS_DEFAULT_REGION="us-east-1"
+   export AWS_ACCESS_KEY_ID="your_access_key_here"
+   export AWS_SECRET_ACCESS_KEY="your_secret_key_here"
+   export AWS_SESSION_TOKEN="your_session_token_here"  # if using temporary credentials
+
+▶ STEP 4: Navigate to scripts folder
+   cd ~/your_workspace/src/ros_to_dynamodb/scripts
+
+▶ STEP 5: Make scripts executable
+   chmod +x *.py
+
+============================================================
+▶▶▶ EASIEST WAY TO STREAM DATA (Run this!) ◀◀◀
+============================================================
+
+   python3 simple_stream.py /drone_0_pcl_render_node/cloud drone_0
+
+   # For drone_7:
+   python3 simple_stream.py /drone_7_ego_planner_node/grid_map/occupancy_inflate drone_7
+
+   # Press Ctrl+C to stop
+
+============================================================
+▶ Query data (see what was sent)
+============================================================
+
+   python3 query_data.py drone_0
+
+   # Or see more:
+   python3 query_data.py drone_0 50
+
+============================================================
+WHAT YOU NEED:
+============================================================
+✓ ROS running on Ubuntu
+✓ Your drone topics publishing data (rostopic list)
+✓ boto3 installed (pip3 install boto3)
+✓ AWS credentials exported in terminal
+✓ This ros_to_dynamodb folder copied to Ubuntu
+
+============================================================
+FILES TO COPY TO UBUNTU:
+============================================================
+ros_to_dynamodb/
+├── scripts/
+│   ├── simple_stream.py          ← USE THIS! (easiest)
+│   ├── ros_to_dynamodb_bridge.py ← Full-featured bridge
+│   ├── query_data.py              ← Query DynamoDB
+│   ├── setup_aws.py               ← Create table
+│   └── test_push.py               ← Test connection
+├── config/
+│   ├── bridge_config.yaml
+│   └── drone_0_cloud.yaml
+├── launch/
+│   ├── ros_to_dynamodb.launch
+│   └── drone_0_cloud.launch
+├── CMakeLists.txt
+├── package.xml
+└── README.md
+
+============================================================
+TESTING (before running ROS):
+============================================================
+
+   # Test AWS connection:
+   python3 test_push.py
+
+   # Query existing data:
+   python3 query_data.py
+
+============================================================
+

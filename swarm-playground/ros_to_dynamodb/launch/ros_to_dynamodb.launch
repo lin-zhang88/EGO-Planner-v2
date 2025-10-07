@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- Load configuration -->
+    <rosparam command="load" file="$(find ros_to_dynamodb)/config/bridge_config.yaml" />
+    
+    <!-- Launch the bridge node -->
+    <node pkg="ros_to_dynamodb" 
+          type="ros_to_dynamodb_bridge.py" 
+          name="ros_to_dynamodb_bridge" 
+          output="screen">
+        
+        <!-- Override parameters here if needed -->
+        <!-- <param name="drone_id" value="drone_7" /> -->
+        <!-- <param name="topic_name" value="/drone_7_ego_planner_node/grid_map/occupancy_inflate" /> -->
+        <!-- <param name="topic_type" value="PointCloud2" /> -->
+    </node>
+</launch>
+
