@@ -1,0 +1,96 @@
+<launch>
+  <!-- Urban Environment Test - 5 Drones -->
+  <!-- Test EGO-Planner on unknown urban-like environment -->
+  
+  <arg name="map_size_x" value="100.0"/>
+  <arg name="map_size_y" value="100.0"/>
+  <arg name="map_size_z" value="5.0"/>
+  <arg name="odom_topic" value="visual_slam/odom" />
+
+  <!-- Urban-like Map Generator -->
+  <node pkg="map_generator" name="urban_map_generator" type="random_forest" output="screen">
+    <param name="map/x_size" value="80.0" />
+    <param name="map/y_size" value="80.0" />
+    <param name="map/z_size" value="5.0" />
+    <param name="map/resolution" value="0.1"/>
+    <param name="ObstacleShape/seed" value="42"/>
+    <param name="map/obs_num" value="200"/>  <!-- More obstacles for urban feel -->
+    <param name="ObstacleShape/lower_rad" value="0.8"/>  <!-- Building-like width -->
+    <param name="ObstacleShape/upper_rad" value="1.5"/>  <!-- Building-like width -->
+    <param name="ObstacleShape/lower_hei" value="2.0"/>  <!-- Building height -->
+    <param name="ObstacleShape/upper_hei" value="4.0"/>  <!-- Building height -->
+    <param name="map/circle_num" value="150"/>  <!-- Circular obstacles -->
+    <param name="ObstacleShape/radius_l" value="1.0"/>  <!-- Building radius -->
+    <param name="ObstacleShape/radius_h" value="2.0"/>  <!-- Building radius -->
+    <param name="ObstacleShape/z_l" value="2.0"/>  <!-- Building height -->
+    <param name="ObstacleShape/z_h" value="4.0"/>  <!-- Building height -->
+    <param name="ObstacleShape/theta" value="0.5"/>
+    <param name="sensing/rate" value="1.0"/>
+    <param name="min_distance" value="1.5"/>  <!-- Street-like spacing -->
+  </node>
+
+  <!-- 5 Drones with EGO-Planner -->
+  <include file="$(find ego_planner)/launch/include/run_in_sim.xml">
+    <arg name="drone_id" value="0"/>
+    <arg name="init_x" value="-30.0"/>
+    <arg name="init_y" value="-30.0"/>
+    <arg name="init_z" value="2.0"/>
+    <arg name="map_size_x" value="$(arg map_size_x)"/>
+    <arg name="map_size_y" value="$(arg map_size_y)"/>
+    <arg name="map_size_z" value="$(arg map_size_z)"/>
+    <arg name="odom_topic" value="$(arg odom_topic)"/>
+    <arg name="flight_type" value="1"/>
+  </include>
+
+  <include file="$(find ego_planner)/launch/include/run_in_sim.xml">
+    <arg name="drone_id" value="1"/>
+    <arg name="init_x" value="-30.0"/>
+    <arg name="init_y" value="30.0"/>
+    <arg name="init_z" value="2.0"/>
+    <arg name="map_size_x" value="$(arg map_size_x)"/>
+    <arg name="map_size_y" value="$(arg map_size_y)"/>
+    <arg name="map_size_z" value="$(arg map_size_z)"/>
+    <arg name="odom_topic" value="$(arg odom_topic)"/>
+    <arg name="flight_type" value="1"/>
+  </include>
+
+  <include file="$(find ego_planner)/launch/include/run_in_sim.xml">
+    <arg name="drone_id" value="2"/>
+    <arg name="init_x" value="30.0"/>
+    <arg name="init_y" value="-30.0"/>
+    <arg name="init_z" value="2.0"/>
+    <arg name="map_size_x" value="$(arg map_size_x)"/>
+    <arg name="map_size_y" value="$(arg map_size_y)"/>
+    <arg name="map_size_z" value="$(arg map_size_z)"/>
+    <arg name="odom_topic" value="$(arg odom_topic)"/>
+    <arg name="flight_type" value="1"/>
+  </include>
+
+  <include file="$(find ego_planner)/launch/include/run_in_sim.xml">
+    <arg name="drone_id" value="3"/>
+    <arg name="init_x" value="30.0"/>
+    <arg name="init_y" value="30.0"/>
+    <arg name="init_z" value="2.0"/>
+    <arg name="map_size_x" value="$(arg map_size_x)"/>
+    <arg name="map_size_y" value="$(arg map_size_y)"/>
+    <arg name="map_size_z" value="$(arg map_size_z)"/>
+    <arg name="odom_topic" value="$(arg odom_topic)"/>
+    <arg name="flight_type" value="1"/>
+  </include>
+
+  <include file="$(find ego_planner)/launch/include/run_in_sim.xml">
+    <arg name="drone_id" value="4"/>
+    <arg name="init_x" value="0.0"/>
+    <arg name="init_y" value="0.0"/>
+    <arg name="init_z" value="2.0"/>
+    <arg name="map_size_x" value="$(arg map_size_x)"/>
+    <arg name="map_size_y" value="$(arg map_size_y)"/>
+    <arg name="map_size_z" value="$(arg map_size_z)"/>
+    <arg name="odom_topic" value="$(arg odom_topic)"/>
+    <arg name="flight_type" value="1"/>
+  </include>
+
+  <!-- RViz for visualization -->
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find ego_planner)/launch/rviz_config.rviz" />
+
+</launch>
