@@ -66,7 +66,14 @@ class SimpleStreamer:
         """Process incoming messages"""
         try:
             self.message_count += 1
-            timestamp = msg.header.stamp.to_sec()
+            
+            # Fix timestamp issue - use current time if ROS timestamp is invalid
+            ros_timestamp = msg.header.stamp.to_sec()
+            if ros_timestamp == 0.0:
+                timestamp = time.time()  # Use current time instead
+                print(f"[{self.message_count}] Using current time (ROS timestamp was 0)")
+            else:
+                timestamp = ros_timestamp
             
             # Extract basic info
             point_count = msg.width * msg.height
@@ -86,6 +93,7 @@ class SimpleStreamer:
             item = {
                 'drone_id': self.drone_id,
                 'timestamp': Decimal(str(timestamp)),
+                'ros_timestamp': Decimal(str(ros_timestamp)),  # Keep original for debugging
                 'message_type': 'PointCloud2',
                 'topic_name': self.topic_name,
                 'frame_id': msg.header.frame_id,
@@ -94,7 +102,10 @@ class SimpleStreamer:
                 'width': msg.width,
                 'height': msg.height,
                 'ingestion_time': Decimal(str(time.time())),
-                'message_number': self.message_count
+                'message_number': self.message_count,
+                'data_type': msg.data_type if hasattr(msg, 'data_type') else 'unknown',
+                'is_dense': msg.is_dense,
+                'field_count': len(msg.fields) if hasattr(msg, 'fields') else 0
             }
             
             # Send to DynamoDB
