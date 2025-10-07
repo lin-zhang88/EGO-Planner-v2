@@ -13,6 +13,7 @@ echo "  • Real-time mapping and visualization"
 echo "  • Performance comparison with ground truth"
 echo ""
 
+
 # Check if we're in the right directory
 if [ ! -d "src/planner" ]; then
     echo "❌ Not in the right directory. Please run from swarm-playground/main_ws/"
@@ -24,7 +25,7 @@ source /opt/ros/noetic/setup.bash
 source devel/setup.bash
 
 echo "🔧 Building ROS workspace..."
-catkin_make
+catkin_make -j1
 
 if [ $? -ne 0 ]; then
     echo "❌ Build failed. Check the errors above."
