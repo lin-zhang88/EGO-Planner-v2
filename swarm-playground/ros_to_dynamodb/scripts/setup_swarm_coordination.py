@@ -54,16 +54,23 @@ def lambda_handler(event, context):
         # For now, we'll just echo back and broadcast
         # In production, you'd query all drones from DynamoDB
         
+        # Get position from sample points (handle empty case)
+        sample_points = telemetry.get('sample_points', [])
+        if sample_points and len(sample_points) > 0:
+            position = {
+                'x': sample_points[0].get('x', 0),
+                'y': sample_points[0].get('y', 0),
+                'z': sample_points[0].get('z', 0)
+            }
+        else:
+            position = {'x': 0, 'y': 0, 'z': 0}
+        
         swarm_state[drone_id] = {
             'timestamp': telemetry.get('timestamp'),
-            'point_count': telemetry.get('point_count'),
-            'frame_id': telemetry.get('frame_id'),
-            'sample_points': telemetry.get('sample_points', [])[:3],  # First 3 points
-            'position': {
-                'x': telemetry.get('sample_points', [{}])[0].get('x', 0),
-                'y': telemetry.get('sample_points', [{}])[0].get('y', 0),
-                'z': telemetry.get('sample_points', [{}])[0].get('z', 0)
-            }
+            'point_count': telemetry.get('point_count', 0),
+            'frame_id': telemetry.get('frame_id', 'unknown'),
+            'sample_points': sample_points[:3],  # First 3 points
+            'position': position
         }
         
         # Step 3: Broadcast swarm state to all drones
