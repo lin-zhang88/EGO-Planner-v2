@@ -19,7 +19,6 @@ from decimal import Decimal
 from sensor_msgs.msg import PointCloud2
 import sensor_msgs.point_cloud2 as pc2
 from threading import Thread, Lock
-import paho.mqtt.client as mqtt_client
 
 # Configuration
 AWS_REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
