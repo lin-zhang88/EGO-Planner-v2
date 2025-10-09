@@ -205,8 +205,7 @@ def setup_swarm_coordination():
                 MemorySize=256,
                 Environment={
                     'Variables': {
-                        'TABLE_NAME': TABLE_NAME,
-                        'AWS_REGION': AWS_REGION
+                        'TABLE_NAME': TABLE_NAME
                     }
                 }
             )
