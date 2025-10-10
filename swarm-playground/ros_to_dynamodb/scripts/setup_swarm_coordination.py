@@ -48,30 +48,74 @@ def lambda_handler(event, context):
         current_time = time.time()
         cutoff_time = current_time - 5  # Last 5 seconds
         
-        # Get all drones (simplified - in production use GSI)
+        # Scan DynamoDB for all recent drones
         swarm_state = {}
         
-        # For now, we'll just echo back and broadcast
-        # In production, you'd query all drones from DynamoDB
-        
-        # Get position from sample points (handle empty case)
-        sample_points = telemetry.get('sample_points', [])
-        if sample_points and len(sample_points) > 0:
-            position = {
-                'x': sample_points[0].get('x', 0),
-                'y': sample_points[0].get('y', 0),
-                'z': sample_points[0].get('z', 0)
+        try:
+            # Get all drone IDs by scanning recent data
+            response = table.scan(
+                FilterExpression='#ts > :cutoff',
+                ExpressionAttributeNames={'#ts': 'timestamp'},
+                ExpressionAttributeValues={':cutoff': Decimal(str(cutoff_time))},
+                Limit=100
+            )
+            
+            # Group by drone_id and keep only the latest from each
+            drone_latest = {}
+            for item in response.get('Items', []):
+                d_id = item.get('drone_id')
+                d_ts = float(item.get('timestamp', 0))
+                
+                if d_id not in drone_latest or d_ts > drone_latest[d_id]['timestamp']:
+                    # Extract position from message_data if available
+                    message_data = item.get('message_data', {})
+                    position = {'x': 0, 'y': 0, 'z': 0}
+                    
+                    # Try to get position from pose message
+                    if 'pose' in message_data:
+                        if 'position' in message_data['pose']:
+                            pos = message_data['pose']['position']
+                            position = {
+                                'x': float(pos.get('x', 0)),
+                                'y': float(pos.get('y', 0)),
+                                'z': float(pos.get('z', 0))
+                            }
+                        elif 'pose' in message_data['pose'] and 'position' in message_data['pose']['pose']:
+                            pos = message_data['pose']['pose']['position']
+                            position = {
+                                'x': float(pos.get('x', 0)),
+                                'y': float(pos.get('y', 0)),
+                                'z': float(pos.get('z', 0))
+                            }
+                    
+                    # Fallback to sample_points if available
+                    sample_points = item.get('sample_points', [])
+                    if not any(position.values()) and sample_points:
+                        position = {
+                            'x': float(sample_points[0].get('x', 0)),
+                            'y': float(sample_points[0].get('y', 0)),
+                            'z': float(sample_points[0].get('z', 0))
+                        }
+                    
+                    drone_latest[d_id] = {
+                        'timestamp': d_ts,
+                        'position': position,
+                        'message_type': str(item.get('message_type', 'unknown')),
+                        'topic_name': str(item.get('topic_name', 'unknown'))
+                    }
+            
+            swarm_state = drone_latest
+            print(f"Found {len(swarm_state)} drones in swarm")
+            
+        except Exception as query_error:
+            print(f"Error querying drones: {query_error}")
+            # Fallback to just current drone
+            swarm_state[drone_id] = {
+                'timestamp': telemetry.get('timestamp'),
+                'position': {'x': 0, 'y': 0, 'z': 0},
+                'message_type': telemetry.get('message_type', 'unknown'),
+                'topic_name': telemetry.get('topic_name', 'unknown')
             }
-        else:
-            position = {'x': 0, 'y': 0, 'z': 0}
-        
-        swarm_state[drone_id] = {
-            'timestamp': telemetry.get('timestamp'),
-            'point_count': telemetry.get('point_count', 0),
-            'frame_id': telemetry.get('frame_id', 'unknown'),
-            'sample_points': sample_points[:3],  # First 3 points
-            'position': position
-        }
         
         # Step 3: Broadcast swarm state to all drones
         swarm_message = {
