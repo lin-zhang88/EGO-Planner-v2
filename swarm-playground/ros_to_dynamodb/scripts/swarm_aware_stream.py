@@ -21,8 +21,7 @@ import time
 import json
 import os
 from decimal import Decimal
-from sensor_msgs.msg import PointCloud2
-import sensor_msgs.point_cloud2 as pc2
+from rospy import AnyMsg
 from threading import Thread, Lock
 
 # Configuration
@@ -57,14 +56,25 @@ class SwarmAwareStreamer:
             rospy.init_node(f'swarm_aware_streamer_{drone_id}', anonymous=True)
             print("✓ ROS node initialized")
         
-        # Subscribe to ROS topic
+        # Subscribe to ROS topic (any message type)
         self.subscriber = rospy.Subscriber(
             topic_name,
-            PointCloud2,
+            AnyMsg,
             self.callback,
             queue_size=10
         )
-        print(f"✓ Subscribed to {topic_name}")
+        
+        # Get topic info to determine message type
+        try:
+            topic_type = rospy.get_published_topics()
+            self.topic_type = None
+            for topic, msg_type in topic_type:
+                if topic == topic_name:
+                    self.topic_type = msg_type
+                    break
+            print(f"✓ Subscribed to {topic_name} (type: {self.topic_type or 'detecting...'})")
+        except:
+            print(f"✓ Subscribed to {topic_name}")
         
         # Subscribe to swarm state
         self._setup_swarm_subscription()
@@ -114,38 +124,39 @@ class SwarmAwareStreamer:
         try:
             self.message_count += 1
             
-            # Get timestamp
-            ros_timestamp = msg.header.stamp.to_sec()
+            # Parse the raw message
+            import genpy
+            connection_header = msg._connection_header['type'].split('/')
+            ros_pkg = connection_header[0]
+            msg_type = connection_header[-1]
+            
+            # Get the message class dynamically
+            msg_class = genpy.message.get_message_class(msg._connection_header['type'])
+            if msg_class:
+                # Deserialize the message
+                actual_msg = msg_class()
+                actual_msg.deserialize(msg._buff)
+            else:
+                actual_msg = msg
+            
+            # Extract timestamp (try common locations)
+            ros_timestamp = 0.0
+            if hasattr(actual_msg, 'header') and hasattr(actual_msg.header, 'stamp'):
+                ros_timestamp = actual_msg.header.stamp.to_sec()
             timestamp = time.time() if ros_timestamp == 0.0 else ros_timestamp
             
-            # Extract point cloud data
-            point_count = msg.width * msg.height
-            
-            # Sample points
-            sample_points = []
-            for i, point in enumerate(pc2.read_points(msg, skip_nans=True)):
-                if i >= 10:
-                    break
-                sample_points.append({
-                    'x': float(point[0]),
-                    'y': float(point[1]),
-                    'z': float(point[2])
-                })
+            # Convert message to dict for JSON serialization
+            msg_dict = self._msg_to_dict(actual_msg)
             
             # Create telemetry item
             telemetry = {
                 'drone_id': self.drone_id,
                 'timestamp': timestamp,
                 'ros_timestamp': ros_timestamp,
-                'message_type': 'PointCloud2',
+                'message_type': msg_type,
+                'ros_package': ros_pkg,
                 'topic_name': self.topic_name,
-                'frame_id': msg.header.frame_id,
-                'point_count': point_count,
-                'sample_points': sample_points,
-                'width': msg.width,
-                'height': msg.height,
-                'is_dense': msg.is_dense,
-                'field_count': len(msg.fields),
+                'message_data': msg_dict,
                 'ingestion_time': time.time(),
                 'message_number': self.message_count
             }
@@ -157,7 +168,7 @@ class SwarmAwareStreamer:
             if self.message_count % 10 == 0:
                 with self.swarm_lock:
                     swarm_size = len(self.swarm_state)
-                print(f"[{self.message_count}] 🟢 ONLINE | Points: {point_count} | Swarm: {swarm_size} drones")
+                print(f"[{self.message_count}] 🟢 ONLINE | Type: {msg_type} | Swarm: {swarm_size} drones")
                 
                 # Show other drones' positions
                 if swarm_size > 0:
@@ -165,6 +176,40 @@ class SwarmAwareStreamer:
                     
         except Exception as e:
             print(f"✗ Callback error: {e}")
+    
+    def _msg_to_dict(self, msg):
+        """Convert ROS message to dictionary"""
+        import genpy
+        
+        msg_dict = {}
+        for field in msg.__slots__:
+            val = getattr(msg, field)
+            
+            # Handle nested messages
+            if hasattr(val, '__slots__'):
+                msg_dict[field] = self._msg_to_dict(val)
+            # Handle lists
+            elif isinstance(val, list):
+                msg_dict[field] = [
+                    self._msg_to_dict(item) if hasattr(item, '__slots__') else self._serialize_value(item)
+                    for item in val[:10]  # Limit to 10 items
+                ]
+            # Handle ROS Time
+            elif isinstance(val, (rospy.Time, rospy.Duration, genpy.Time, genpy.Duration)):
+                msg_dict[field] = val.to_sec()
+            else:
+                msg_dict[field] = self._serialize_value(val)
+        
+        return msg_dict
+    
+    def _serialize_value(self, val):
+        """Serialize a value for JSON"""
+        if isinstance(val, (int, float, str, bool)):
+            return val
+        elif isinstance(val, bytes):
+            return val.decode('utf-8', errors='ignore')[:100]  # Limit size
+        else:
+            return str(val)
     
     def publish_telemetry(self, telemetry):
         """Publish telemetry to IoT Core"""
