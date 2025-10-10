@@ -384,9 +384,10 @@ def setup_swarm_coordination():
         print("  4. Lambda broadcasts → drone/swarm/state")
         print("  5. Drones subscribe → drone/swarm/state (get all positions)")
         print("\n🚀 Next Steps:")
-        print("  1. Run: python3 greengrass_stream.py multi")
+        print("  1. Run: python3 swarm_aware_stream.py multi <topic1:drone_id1> <topic2:drone_id2>")
+        print("     Example: python3 swarm_aware_stream.py multi /drone_0_odom_visualization/pose:drone_0 /drone_1_odom_visualization/pose:drone_1")
         print("  2. Subscribe to: drone/swarm/state (in IoT Core)")
-        print("  3. Watch real-time swarm coordination!")
+        print("  3. Watch real-time swarm coordination with ALL drones!")
         
     except Exception as e:
         print(f"\n✗ Setup failed: {e}")
