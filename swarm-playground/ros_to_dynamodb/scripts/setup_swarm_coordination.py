@@ -44,34 +44,121 @@ def lambda_handler(event, context):
         ddb_item = convert_to_decimal(telemetry)
         table.put_item(Item=ddb_item)
         
-        # Step 2: Query recent positions of all drones (last 5 seconds)
+        # Step 2: Query all recent drone positions from DynamoDB
         current_time = time.time()
-        cutoff_time = current_time - 5  # Last 5 seconds
+        cutoff_time = current_time - 10  # Last 10 seconds
         
-        # Get all drones (simplified - in production use GSI)
         swarm_state = {}
         
-        # For now, we'll just echo back and broadcast
-        # In production, you'd query all drones from DynamoDB
-        
-        # Get position from sample points (handle empty case)
-        sample_points = telemetry.get('sample_points', [])
-        if sample_points and len(sample_points) > 0:
-            position = {
-                'x': sample_points[0].get('x', 0),
-                'y': sample_points[0].get('y', 0),
-                'z': sample_points[0].get('z', 0)
-            }
-        else:
+        try:
+            # Scan table for all recent drone data
+            response = table.scan(
+                FilterExpression='timestamp > :cutoff',
+                ExpressionAttributeValues={
+                    ':cutoff': Decimal(str(cutoff_time))
+                }
+            )
+            
+            # Group by drone_id and get latest position for each
+            drone_latest = {}
+            for item in response['Items']:
+                item_drone_id = item.get('drone_id', 'unknown')
+                item_timestamp = float(item.get('timestamp', 0))
+                
+                # Keep the latest entry for each drone
+                if item_drone_id not in drone_latest or item_timestamp > drone_latest[item_drone_id]['timestamp']:
+                    drone_latest[item_drone_id] = item
+            
+            # Convert to swarm state format
+            for drone_id_key, item in drone_latest.items():
+                # Extract position - the streamer puts it at top level
+                position = {'x': 0, 'y': 0, 'z': 0}
+                
+                if 'position' in item:  # Direct position from streamer
+                    pos = item['position']
+                    position = {
+                        'x': float(pos.get('x', 0)),
+                        'y': float(pos.get('y', 0)),
+                        'z': float(pos.get('z', 0))
+                    }
+                else:
+                    # Fallback to old format if needed
+                    message_data = item.get('message_data', {})
+                    if 'position' in message_data:  # PoseStamped
+                        pos = message_data['position']
+                        position = {
+                            'x': float(pos.get('x', 0)),
+                            'y': float(pos.get('y', 0)),
+                            'z': float(pos.get('z', 0))
+                        }
+                    elif 'pose' in message_data and 'position' in message_data['pose']:  # Odometry
+                        pos = message_data['pose']['position']
+                        position = {
+                            'x': float(pos.get('x', 0)),
+                            'y': float(pos.get('y', 0)),
+                            'z': float(pos.get('z', 0))
+                        }
+                    elif 'sample_points' in item and item['sample_points']:  # PointCloud2
+                        pos = item['sample_points'][0]
+                        position = {
+                            'x': float(pos.get('x', 0)),
+                            'y': float(pos.get('y', 0)),
+                            'z': float(pos.get('z', 0))
+                        }
+                
+                swarm_state[drone_id_key] = {
+                    'timestamp': float(item.get('timestamp', 0)),
+                    'position': position,
+                    'message_type': item.get('message_type', 'unknown'),
+                    'topic_name': item.get('topic_name', 'unknown')
+                }
+            
+            print(f"Found {len(swarm_state)} active drones: {list(swarm_state.keys())}")
+            
+        except Exception as db_error:
+            print(f"Database query error: {db_error}")
+            # Fallback: just use current drone
             position = {'x': 0, 'y': 0, 'z': 0}
-        
-        swarm_state[drone_id] = {
-            'timestamp': telemetry.get('timestamp'),
-            'point_count': telemetry.get('point_count', 0),
-            'frame_id': telemetry.get('frame_id', 'unknown'),
-            'sample_points': sample_points[:3],  # First 3 points
-            'position': position
-        }
+            
+            # Check top-level position first (from streamer)
+            if 'position' in telemetry:
+                pos = telemetry['position']
+                position = {
+                    'x': float(pos.get('x', 0)),
+                    'y': float(pos.get('y', 0)),
+                    'z': float(pos.get('z', 0))
+                }
+            else:
+                # Fallback to old format if needed
+                message_data = telemetry.get('message_data', {})
+                if 'position' in message_data:  # PoseStamped
+                    pos = message_data['position']
+                    position = {
+                        'x': float(pos.get('x', 0)),
+                        'y': float(pos.get('y', 0)),
+                        'z': float(pos.get('z', 0))
+                    }
+                elif 'pose' in message_data and 'position' in message_data['pose']:  # Odometry
+                    pos = message_data['pose']['position']
+                    position = {
+                        'x': float(pos.get('x', 0)),
+                        'y': float(pos.get('y', 0)),
+                        'z': float(pos.get('z', 0))
+                    }
+                elif 'sample_points' in telemetry and telemetry['sample_points']:  # PointCloud2
+                    pos = telemetry['sample_points'][0]
+                    position = {
+                        'x': float(pos.get('x', 0)),
+                        'y': float(pos.get('y', 0)),
+                        'z': float(pos.get('z', 0))
+                    }
+            
+            swarm_state[drone_id] = {
+                'timestamp': telemetry.get('timestamp'),
+                'position': position,
+                'message_type': telemetry.get('message_type', 'unknown'),
+                'topic_name': telemetry.get('topic_name', 'unknown')
+            }
         
         # Step 3: Broadcast swarm state to all drones
         swarm_message = {
@@ -101,6 +188,8 @@ def lambda_handler(event, context):
         
     except Exception as e:
         print(f"Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             'statusCode': 500,
             'body': json.dumps({'error': str(e)})
