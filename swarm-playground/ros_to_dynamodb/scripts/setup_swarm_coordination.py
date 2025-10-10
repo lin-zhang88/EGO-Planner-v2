@@ -44,21 +44,17 @@ def lambda_handler(event, context):
         ddb_item = convert_to_decimal(telemetry)
         table.put_item(Item=ddb_item)
         
-        # Step 2: Query recent positions of all drones (last 5 seconds)
+        # Step 2: Get all active drones from DynamoDB
         current_time = time.time()
-        cutoff_time = current_time - 5  # Last 5 seconds
-        
-        # Scan DynamoDB for all recent drones
         swarm_state = {}
         
         try:
-            # Get all drone IDs by scanning recent data
-            response = table.scan(
-                FilterExpression='#ts > :cutoff',
-                ExpressionAttributeNames={'#ts': 'timestamp'},
-                ExpressionAttributeValues={':cutoff': Decimal(str(cutoff_time))},
-                Limit=100
-            )
+            print(f"Scanning DynamoDB for all drones...")
+            
+            # Scan for all drones (get latest entry per drone_id)
+            response = table.scan(Limit=1000)
+            
+            print(f"Scan returned {len(response.get('Items', []))} items")
             
             # Group by drone_id and keep only the latest from each
             drone_latest = {}
