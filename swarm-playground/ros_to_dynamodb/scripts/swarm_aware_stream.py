@@ -9,9 +9,9 @@ Usage:
     # Single drone
     python3 swarm_aware_stream.py /drone_0_pcl_render_node/cloud drone_0
     
-    # Multiple drones (specify drone IDs)
-    python3 swarm_aware_stream.py multi drone_0 drone_1
-    python3 swarm_aware_stream.py multi drone_0 drone_1 drone_2
+    # Multiple drones (topic:drone_id pairs)
+    python3 swarm_aware_stream.py multi /drone_0_pcl_render_node/cloud:drone_0 /drone_1_pcl_render_node/cloud:drone_1
+    python3 swarm_aware_stream.py multi /drone_0_ego_planner/grid:drone_0 /drone_1_sensor/data:drone_1
 """
 
 import rospy
@@ -29,9 +29,6 @@ from threading import Thread, Lock
 AWS_REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
 TABLE_NAME = "drone_telemetry"
 SWARM_TOPIC = "drone/swarm/state"
-
-# Topic template for multi-drone mode
-TOPIC_TEMPLATE = "/drone_{}_pcl_render_node/cloud"
 
 class SwarmAwareStreamer:
     """Drone streamer with swarm awareness for collision avoidance"""
@@ -225,13 +222,15 @@ class SwarmAwareStreamer:
 class MultiDroneSwarmStreamer:
     """Stream multiple drones simultaneously"""
     
-    def __init__(self, drone_ids):
-        # Build topics from drone IDs
+    def __init__(self, topic_drone_pairs):
+        # Parse topic:drone_id pairs
         self.drone_topics = []
-        for drone_id in drone_ids:
-            # Extract number from drone_id (e.g., "drone_0" -> "0")
-            drone_num = drone_id.split('_')[-1] if '_' in drone_id else drone_id
-            topic = TOPIC_TEMPLATE.format(drone_num)
+        for pair in topic_drone_pairs:
+            if ':' not in pair:
+                print(f"Error: Invalid format '{pair}'. Expected 'topic:drone_id'")
+                sys.exit(1)
+            
+            topic, drone_id = pair.split(':', 1)
             self.drone_topics.append((topic, drone_id))
         
         print("=" * 70)
@@ -272,19 +271,19 @@ if __name__ == '__main__':
     # Check for multi-drone mode
     if len(sys.argv) > 1 and sys.argv[1] == 'multi':
         if len(sys.argv) < 3:
-            print("Error: Please specify drone IDs for multi mode")
+            print("Error: Please specify topic:drone_id pairs for multi mode")
             print()
             print("Usage:")
-            print("  python3 swarm_aware_stream.py multi <drone_id1> <drone_id2> ...")
+            print("  python3 swarm_aware_stream.py multi <topic1:drone_id1> <topic2:drone_id2> ...")
             print()
             print("Examples:")
-            print("  python3 swarm_aware_stream.py multi drone_0 drone_1")
-            print("  python3 swarm_aware_stream.py multi drone_0 drone_1 drone_2")
+            print("  python3 swarm_aware_stream.py multi /drone_0_pcl_render_node/cloud:drone_0 /drone_1_pcl_render_node/cloud:drone_1")
+            print("  python3 swarm_aware_stream.py multi /drone_0_ego_planner/grid:drone_0 /drone_1_sensor/data:drone_1")
             sys.exit(1)
         
-        # Get drone IDs from command line
-        drone_ids = sys.argv[2:]
-        multi_streamer = MultiDroneSwarmStreamer(drone_ids)
+        # Get topic:drone_id pairs from command line
+        topic_drone_pairs = sys.argv[2:]
+        multi_streamer = MultiDroneSwarmStreamer(topic_drone_pairs)
         multi_streamer.run()
         
     elif len(sys.argv) >= 3:
@@ -296,14 +295,14 @@ if __name__ == '__main__':
     else:
         print("Usage:")
         print("  Single drone: python3 swarm_aware_stream.py <topic> <drone_id>")
-        print("  Multi drone:  python3 swarm_aware_stream.py multi <drone_id1> <drone_id2> ...")
+        print("  Multi drone:  python3 swarm_aware_stream.py multi <topic1:drone_id1> <topic2:drone_id2> ...")
         print()
         print("Examples:")
         print("  # Single drone")
         print("  python3 swarm_aware_stream.py /drone_0_pcl_render_node/cloud drone_0")
         print()
-        print("  # Multiple drones")
-        print("  python3 swarm_aware_stream.py multi drone_0 drone_1")
-        print("  python3 swarm_aware_stream.py multi drone_0 drone_1 drone_2")
+        print("  # Multiple drones with custom topics")
+        print("  python3 swarm_aware_stream.py multi /drone_0_pcl_render_node/cloud:drone_0 /drone_1_pcl_render_node/cloud:drone_1")
+        print("  python3 swarm_aware_stream.py multi /drone_0_ego_planner/grid:drone_0 /drone_1_sensor/data:drone_1")
         sys.exit(1)
 
