@@ -6,7 +6,12 @@ Swarm-Aware Drone Streamer
 - Provides real-time positions of all drones
 
 Usage:
+    # Single drone
     python3 swarm_aware_stream.py /drone_0_pcl_render_node/cloud drone_0
+    
+    # Multiple drones (specify drone IDs)
+    python3 swarm_aware_stream.py multi drone_0 drone_1
+    python3 swarm_aware_stream.py multi drone_0 drone_1 drone_2
 """
 
 import rospy
@@ -25,10 +30,13 @@ AWS_REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
 TABLE_NAME = "drone_telemetry"
 SWARM_TOPIC = "drone/swarm/state"
 
+# Topic template for multi-drone mode
+TOPIC_TEMPLATE = "/drone_{}_pcl_render_node/cloud"
+
 class SwarmAwareStreamer:
     """Drone streamer with swarm awareness for collision avoidance"""
     
-    def __init__(self, topic_name, drone_id):
+    def __init__(self, topic_name, drone_id, init_ros=True):
         self.topic_name = topic_name
         self.drone_id = drone_id
         self.message_count = 0
@@ -47,9 +55,10 @@ class SwarmAwareStreamer:
         # Initialize AWS clients
         self._init_aws_clients()
         
-        # Initialize ROS
-        rospy.init_node(f'swarm_aware_streamer_{drone_id}', anonymous=True)
-        print("✓ ROS node initialized")
+        # Initialize ROS (only once for multi-drone)
+        if init_ros:
+            rospy.init_node(f'swarm_aware_streamer_{drone_id}', anonymous=True)
+            print("✓ ROS node initialized")
         
         # Subscribe to ROS topic
         self.subscriber = rospy.Subscriber(
@@ -213,17 +222,88 @@ class SwarmAwareStreamer:
         print("=" * 70)
 
 
+class MultiDroneSwarmStreamer:
+    """Stream multiple drones simultaneously"""
+    
+    def __init__(self, drone_ids):
+        # Build topics from drone IDs
+        self.drone_topics = []
+        for drone_id in drone_ids:
+            # Extract number from drone_id (e.g., "drone_0" -> "0")
+            drone_num = drone_id.split('_')[-1] if '_' in drone_id else drone_id
+            topic = TOPIC_TEMPLATE.format(drone_num)
+            self.drone_topics.append((topic, drone_id))
+        
+        print("=" * 70)
+        print("🚁🚁 Multi-Drone Swarm Streamer")
+        print("=" * 70)
+        print(f"Streaming {len(self.drone_topics)} drones:")
+        for topic, drone_id in self.drone_topics:
+            print(f"  • {topic} → {drone_id}")
+        print("=" * 70)
+        
+        # Initialize ROS once
+        rospy.init_node('multi_drone_swarm_streamer', anonymous=True)
+        print("✓ ROS node initialized\n")
+        
+        # Create streamers for each drone
+        self.streamers = []
+        for topic, drone_id in self.drone_topics:
+            print(f"Setting up {drone_id}...")
+            streamer = SwarmAwareStreamer(topic, drone_id, init_ros=False)
+            self.streamers.append(streamer)
+            print()
+        
+        print("🚀 All drones streaming!")
+        print("-" * 70)
+    
+    def run(self):
+        """Keep streaming all drones"""
+        try:
+            rospy.spin()
+        except KeyboardInterrupt:
+            print("\n" + "=" * 70)
+            print("🛑 Shutting down all drones...")
+            for streamer in self.streamers:
+                streamer._shutdown()
+
+
 if __name__ == '__main__':
-    if len(sys.argv) >= 3:
+    # Check for multi-drone mode
+    if len(sys.argv) > 1 and sys.argv[1] == 'multi':
+        if len(sys.argv) < 3:
+            print("Error: Please specify drone IDs for multi mode")
+            print()
+            print("Usage:")
+            print("  python3 swarm_aware_stream.py multi <drone_id1> <drone_id2> ...")
+            print()
+            print("Examples:")
+            print("  python3 swarm_aware_stream.py multi drone_0 drone_1")
+            print("  python3 swarm_aware_stream.py multi drone_0 drone_1 drone_2")
+            sys.exit(1)
+        
+        # Get drone IDs from command line
+        drone_ids = sys.argv[2:]
+        multi_streamer = MultiDroneSwarmStreamer(drone_ids)
+        multi_streamer.run()
+        
+    elif len(sys.argv) >= 3:
+        # Single drone mode
         topic = sys.argv[1]
         drone_id = sys.argv[2]
         streamer = SwarmAwareStreamer(topic, drone_id)
         streamer.run()
     else:
         print("Usage:")
-        print("  python3 swarm_aware_stream.py <topic> <drone_id>")
+        print("  Single drone: python3 swarm_aware_stream.py <topic> <drone_id>")
+        print("  Multi drone:  python3 swarm_aware_stream.py multi <drone_id1> <drone_id2> ...")
         print()
-        print("Example:")
+        print("Examples:")
+        print("  # Single drone")
         print("  python3 swarm_aware_stream.py /drone_0_pcl_render_node/cloud drone_0")
+        print()
+        print("  # Multiple drones")
+        print("  python3 swarm_aware_stream.py multi drone_0 drone_1")
+        print("  python3 swarm_aware_stream.py multi drone_0 drone_1 drone_2")
         sys.exit(1)
 
