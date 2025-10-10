@@ -21,8 +21,7 @@ import time
 import json
 import os
 from decimal import Decimal
-from sensor_msgs.msg import PointCloud2
-import sensor_msgs.point_cloud2 as pc2
+from rospy import AnyMsg
 from threading import Thread, Lock
 
 # Configuration
@@ -57,14 +56,14 @@ class SwarmAwareStreamer:
             rospy.init_node(f'swarm_aware_streamer_{drone_id}', anonymous=True)
             print("✓ ROS node initialized")
         
-        # Subscribe to ROS topic
+        # Subscribe to ROS topic (any message type)
         self.subscriber = rospy.Subscriber(
             topic_name,
-            PointCloud2,
+            AnyMsg,
             self.callback,
             queue_size=10
         )
-        print(f"✓ Subscribed to {topic_name}")
+        print(f"✓ Subscribed to {topic_name} (accepts any message type)")
         
         # Subscribe to swarm state
         self._setup_swarm_subscription()
@@ -114,40 +113,86 @@ class SwarmAwareStreamer:
         try:
             self.message_count += 1
             
+            # Get message type from connection header
+            msg_type_full = msg._connection_header['type']
+            msg_type = msg_type_full.split('/')[-1]
+            
+            # Deserialize based on message type
+            import genpy
+            msg_class = genpy.message.get_message_class(msg_type_full)
+            
+            if msg_class:
+                actual_msg = msg_class()
+                actual_msg.deserialize(msg._buff)
+            else:
+                print(f"⚠ Could not deserialize {msg_type_full}")
+                return
+            
             # Get timestamp
-            ros_timestamp = msg.header.stamp.to_sec()
+            ros_timestamp = 0.0
+            if hasattr(actual_msg, 'header') and hasattr(actual_msg.header, 'stamp'):
+                ros_timestamp = actual_msg.header.stamp.to_sec()
             timestamp = time.time() if ros_timestamp == 0.0 else ros_timestamp
             
-            # Extract point cloud data
-            point_count = msg.width * msg.height
+            # Extract position based on message type
+            position = {'x': 0, 'y': 0, 'z': 0}
+            extra_data = {}
             
-            # Sample points
-            sample_points = []
-            for i, point in enumerate(pc2.read_points(msg, skip_nans=True)):
-                if i >= 10:
-                    break
-                sample_points.append({
-                    'x': float(point[0]),
-                    'y': float(point[1]),
-                    'z': float(point[2])
-                })
+            if msg_type == 'PoseStamped':
+                # Handle PoseStamped
+                position = {
+                    'x': float(actual_msg.pose.position.x),
+                    'y': float(actual_msg.pose.position.y),
+                    'z': float(actual_msg.pose.position.z)
+                }
+                extra_data['orientation'] = {
+                    'x': float(actual_msg.pose.orientation.x),
+                    'y': float(actual_msg.pose.orientation.y),
+                    'z': float(actual_msg.pose.orientation.z),
+                    'w': float(actual_msg.pose.orientation.w)
+                }
+            elif msg_type == 'PointCloud2':
+                # Handle PointCloud2
+                import sensor_msgs.point_cloud2 as pc2
+                sample_points = []
+                for i, point in enumerate(pc2.read_points(actual_msg, skip_nans=True)):
+                    if i >= 10:
+                        break
+                    sample_points.append({
+                        'x': float(point[0]),
+                        'y': float(point[1]),
+                        'z': float(point[2])
+                    })
+                if sample_points:
+                    position = sample_points[0]
+                extra_data['point_count'] = actual_msg.width * actual_msg.height
+                extra_data['sample_points'] = sample_points
+            elif msg_type == 'Odometry':
+                # Handle Odometry
+                position = {
+                    'x': float(actual_msg.pose.pose.position.x),
+                    'y': float(actual_msg.pose.pose.position.y),
+                    'z': float(actual_msg.pose.pose.position.z)
+                }
+                extra_data['twist'] = {
+                    'linear': {
+                        'x': float(actual_msg.twist.twist.linear.x),
+                        'y': float(actual_msg.twist.twist.linear.y),
+                        'z': float(actual_msg.twist.twist.linear.z)
+                    }
+                }
             
             # Create telemetry item
             telemetry = {
                 'drone_id': self.drone_id,
                 'timestamp': timestamp,
                 'ros_timestamp': ros_timestamp,
-                'message_type': 'PointCloud2',
+                'message_type': msg_type,
                 'topic_name': self.topic_name,
-                'frame_id': msg.header.frame_id,
-                'point_count': point_count,
-                'sample_points': sample_points,
-                'width': msg.width,
-                'height': msg.height,
-                'is_dense': msg.is_dense,
-                'field_count': len(msg.fields),
+                'position': position,
                 'ingestion_time': time.time(),
-                'message_number': self.message_count
+                'message_number': self.message_count,
+                **extra_data
             }
             
             # Publish to IoT Core
@@ -157,7 +202,7 @@ class SwarmAwareStreamer:
             if self.message_count % 10 == 0:
                 with self.swarm_lock:
                     swarm_size = len(self.swarm_state)
-                print(f"[{self.message_count}] 🟢 ONLINE | Points: {point_count} | Swarm: {swarm_size} drones")
+                print(f"[{self.message_count}] 🟢 ONLINE | Type: {msg_type} | Pos: ({position['x']:.2f}, {position['y']:.2f}, {position['z']:.2f}) | Swarm: {swarm_size}")
                 
                 # Show other drones' positions
                 if swarm_size > 0:
@@ -165,6 +210,8 @@ class SwarmAwareStreamer:
                     
         except Exception as e:
             print(f"✗ Callback error: {e}")
+            import traceback
+            traceback.print_exc()
     
     def publish_telemetry(self, telemetry):
         """Publish telemetry to IoT Core"""
